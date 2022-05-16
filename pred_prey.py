@@ -76,6 +76,6 @@ class PredPreyModel(Model):
 
         return self.last_uid
 
-    def step(self):
+    def stepy(self):
         self.step_number += 1
         self.schedule.step()
