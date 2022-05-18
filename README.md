@@ -15,3 +15,6 @@ The minimal viable product is a crowd with a linearly decreasing space between v
 
 <!-- bier halen -->
 <!-- Naar de wc -->
+
+
+<!-- Deelvraag: Wie is het best om naar een ongeval te sturen  -->
