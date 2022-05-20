@@ -33,7 +33,20 @@ class Person(Agent):
             x_displacement = x_unit * self._running_speed
             y_displacement = y_unit * self._running_speed
 
-        self.model.space.move_agent(self, (x_displacement, y_displacement))
+        new_x_pos = self.pos[0] + x_displacement
+        new_y_pos = self.pos[1] + y_displacement
+        new_pos = (new_x_pos, new_y_pos)
+
+        # Bound checks for the concert hall
+        if (
+            new_x_pos > self.model.space.width
+            or new_y_pos > self.model.space.height
+            or new_x_pos < 0
+            or new_y_pos < 0
+        ):
+            return
+
+        self.model.space.move_agent(self, new_pos)
 
     def get_angle(self):
         angle = random.randint(0, 360)
@@ -59,27 +72,41 @@ class Worker(Person):
 class ConcertHall(Model):
     def __init__(self, n_visitors, width, height) -> None:
         self._n_visitor = n_visitors
-        self.middle = (width / 2, height / 2)
+        self._width = width
+        self._height = height
+        self._middle = (width / 2, height / 2)
         self.space = ContinuousSpace(width, height, False)
         self._schedule = RandomActivation(self)
         self._locations = []
 
         for i in range(n_visitors):
-            visitor = Visitor(i, ConcertHall)
+            visitor = Visitor(i, self)
             self._schedule.add(visitor)
             x = self.random.randrange(self.space.width)
             y = self.random.randrange(self.space.height)
-            self._grid.place_agent(visitor, (x, y))
+            self.space.place_agent(visitor, (x, y))
 
     def save_locations(self):
-        agents = self.get_neighbours(
-            self.middle,
+        agents = self.space.get_neighbors(
+            self._middle,
             np.sqrt((self.space.width / 2) ** 2 + (self.space.height / 2) ** 2),
         )
-        print(agents)
-        # agents = np.array(agents)
-        # positions = [agent.pos for agent in agents]
-        # self._locations.append(positions)
+
+        positions = np.array([agent.pos for agent in agents])
+        self._locations.append(positions)
+
+    def get_locations(self):
+        return self._locations
+
+    def get_space(self):
+        return self.space
+
+    def get_width(self):
+        return self._width
+
+    def get_heigth(self):
+        return self._height
 
     def step(self) -> None:
+        self.save_locations()
         self._schedule.step()
