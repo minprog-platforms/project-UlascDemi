@@ -1,6 +1,7 @@
 from mesa import Agent, Model
 from mesa.space import ContinuousSpace
 from mesa.time import RandomActivation
+from mesa.datacollection import DataCollector
 import numpy as np
 import random
 
@@ -12,9 +13,10 @@ class Person(Agent):
         super().__init__(unique_id, model)
         self._uid = unique_id
         self._gender = random.randint(MALE, FEMALE)
-        self._size = 0
+        self._size = 0.5
         self._running = False
         self._walking_speed = 1.4
+        self._type = ""
 
         if self._gender == MALE:
             self._running_speed = 2.4
@@ -37,13 +39,61 @@ class Person(Agent):
         new_y_pos = self.pos[1] + y_displacement
         new_pos = (new_x_pos, new_y_pos)
 
+        bot_bound = self.model.worker_space
+        right_bound = self.model.space.width - self.model.worker_space
+        top_bound = self.model.space.height - self.model.worker_space
+        left_bound = self.model.worker_space
+
         # Bound checks for the concert hall
-        if (
-            new_x_pos > self.model.space.width
-            or new_y_pos > self.model.space.height
-            or new_x_pos < 0
-            or new_y_pos < 0
-        ):
+        if self.type == "Visitor":
+            if (
+                new_x_pos > right_bound
+                or new_x_pos < left_bound
+                or new_y_pos > top_bound
+                or new_y_pos < bot_bound
+            ):
+                return
+        elif self.type == "Worker":
+            # Bottom side
+            if self.pos[1] < bot_bound:
+                if (
+                    new_x_pos < 0
+                    or new_x_pos > self.model.space.width
+                    or new_y_pos < 0
+                    or new_y_pos > self.model.space.height
+                ):
+                    return
+            # Right side
+            elif self.pos[0] > right_bound:
+                if (
+                    new_x_pos < right_bound
+                    or new_x_pos > self.model.space.width
+                    or new_y_pos < 0
+                    or new_y_pos > self.model.space.height
+                ):
+                    return
+            # Top side
+            elif self.pos[1] > top_bound:
+                if (
+                    new_x_pos < 0
+                    or new_x_pos > self.model.space.width
+                    or new_y_pos < top_bound
+                    or new_y_pos > self.model.space.height
+                ):
+                    return
+            # Left side
+            elif self.pos[0] < left_bound:
+                if (
+                    new_x_pos < 0
+                    or new_x_pos > self.model.worker_space
+                    or new_y_pos < 0
+                    or new_y_pos > self.model.space.height
+                ):
+                    return
+
+        agents_new_pos = self.model.space.get_neighbors(new_pos, self._size)
+
+        if len(agents_new_pos) > 1:
             return
 
         self.model.space.move_agent(self, new_pos)
@@ -55,36 +105,82 @@ class Person(Agent):
     def get_gender(self):
         return self._gender
 
-    def step(self):
-        self.move()
-
 
 class Visitor(Person):
     def __init__(self, unique_id, model) -> None:
         super().__init__(unique_id, model)
+        self.type = "Visitor"
+
+    # def step(self):
+    #     self.move()
 
 
 class Worker(Person):
     def __init__(self, unique_id, model) -> None:
         super().__init__(unique_id, model)
+        self.type = "Worker"
+
+    def step(self):
+        self.move()
 
 
 class ConcertHall(Model):
-    def __init__(self, n_visitors, width, height) -> None:
+    def __init__(self, n_visitors, n_workers, width, height) -> None:
+        assert width > 2
+        assert height > 2
+
         self._n_visitor = n_visitors
+        self._n_worker = n_workers
         self._width = width
         self._height = height
         self._middle = (width / 2, height / 2)
+        self.worker_space = 2
         self.space = ContinuousSpace(width, height, False)
-        self._schedule = RandomActivation(self)
+        self.schedule = RandomActivation(self)
         self._locations = []
 
-        for i in range(n_visitors):
+        # Create the visitors
+        for i in range(self._n_visitor):
             visitor = Visitor(i, self)
-            self._schedule.add(visitor)
-            x = self.random.randrange(self.space.width)
-            y = self.random.randrange(self.space.height)
+            self.schedule.add(visitor)
+            x = self.random.randrange(
+                self.worker_space, self.space.width - self.worker_space
+            )
+            y = self.random.randrange(
+                self.worker_space, self.space.height - self.worker_space
+            )
             self.space.place_agent(visitor, (x, y))
+
+        i += 1
+        # Create the workers
+        for j in range(i, i + self._n_worker):
+            worker = Worker(j, self)
+            self.schedule.add(worker)
+            rng_number = random.random()
+            # Bottom side
+            if rng_number < 0.25:
+                x = self.random.randrange(0, self.space.width)
+                y = self.random.randrange(0, self.worker_space)
+            # Right side
+            elif rng_number >= 0.25 and rng_number < 0.5:
+                x = self.random.randrange(
+                    self.space.width - self.worker_space, self.space.width
+                )
+                y = self.random.randrange(0, self.space.height)
+            # Top side
+            elif rng_number >= 0.5 and rng_number < 0.75:
+                x = self.random.randrange(0, self.space.width)
+                y = self.random.randrange(
+                    self.space.height - self.worker_space, self.space.height
+                )
+            # Left side
+            elif rng_number >= 0.75 and rng_number <= 1.00:
+                x = self.random.randrange(0, self.worker_space)
+                y = self.random.randrange(0, self.space.height)
+
+            self.space.place_agent(worker, (x, y))
+
+        self.datacollector = DataCollector(agent_reporters={"positions": "pos"})
 
     def save_locations(self):
         agents = self.space.get_neighbors(
@@ -109,4 +205,5 @@ class ConcertHall(Model):
 
     def step(self) -> None:
         self.save_locations()
-        self._schedule.step()
+        # self.datacollector.collect(self)
+        self.schedule.step()
