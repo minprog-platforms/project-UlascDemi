@@ -5,40 +5,56 @@ from mesa.datacollection import DataCollector
 import numpy as np
 import random
 
-MALE, FEMALE = 0, 1
+# TODO
+# pandas dataframes fixen
+# moet uiteindelijk visueel duidelijk zijn en moet plotje komen
+
+
+def get_x_loc(agent):
+    return agent.pos[0]
+
+
+def get_y_loc(agent):
+    return agent.pos[1]
 
 
 class Person(Agent):
     def __init__(self, unique_id: int, model) -> None:
         super().__init__(unique_id, model)
         self._uid = unique_id
-        self._gender = random.randint(MALE, FEMALE)
         self._size = 0.5
-        self._running = False
+        # self._running = False
         self._walking_speed = 1.4
         self._type = ""
-
-        if self._gender == MALE:
-            self._running_speed = 2.4
-        elif self._gender == FEMALE:
-            self._running_speed = 2.3
 
     def move(self):
         angle = self.get_angle()
         x_unit = np.cos(angle)
         y_unit = np.sin(angle)
 
-        if self._running == False:
-            x_displacement = x_unit * self._walking_speed
-            y_displacement = y_unit * self._walking_speed
-        else:
-            x_displacement = x_unit * self._running_speed
-            y_displacement = y_unit * self._running_speed
+        x_displacement = x_unit * self._walking_speed
+        y_displacement = y_unit * self._walking_speed
 
         new_x_pos = self.pos[0] + x_displacement
         new_y_pos = self.pos[1] + y_displacement
         new_pos = (new_x_pos, new_y_pos)
 
+        if self.bound_checks(new_x_pos, new_y_pos) == False:
+            return
+
+        agents_new_pos = self.model.space.get_neighbors(new_pos, self._size)
+
+        if len(agents_new_pos) > 1:
+            return
+
+        self.model.space.move_agent(self, new_pos)
+
+    def get_angle(self):
+        angle = random.random() * 2 * np.pi
+        return angle
+
+    def bound_checks(self, new_x_pos, new_y_pos):
+        """Returns true or false"""
         bot_bound = self.model.worker_space
         right_bound = self.model.space.width - self.model.worker_space
         top_bound = self.model.space.height - self.model.worker_space
@@ -52,7 +68,7 @@ class Person(Agent):
                 or new_y_pos > top_bound
                 or new_y_pos < bot_bound
             ):
-                return
+                return False
         elif self.type == "Worker":
             # Bottom side
             if self.pos[1] < bot_bound:
@@ -62,7 +78,7 @@ class Person(Agent):
                     or new_y_pos < 0
                     or new_y_pos > self.model.space.height
                 ):
-                    return
+                    return False
             # Right side
             elif self.pos[0] > right_bound:
                 if (
@@ -71,7 +87,7 @@ class Person(Agent):
                     or new_y_pos < 0
                     or new_y_pos > self.model.space.height
                 ):
-                    return
+                    return False
             # Top side
             elif self.pos[1] > top_bound:
                 if (
@@ -80,7 +96,7 @@ class Person(Agent):
                     or new_y_pos < top_bound
                     or new_y_pos > self.model.space.height
                 ):
-                    return
+                    return False
             # Left side
             elif self.pos[0] < left_bound:
                 if (
@@ -89,21 +105,8 @@ class Person(Agent):
                     or new_y_pos < 0
                     or new_y_pos > self.model.space.height
                 ):
-                    return
-
-        agents_new_pos = self.model.space.get_neighbors(new_pos, self._size)
-
-        if len(agents_new_pos) > 1:
-            return
-
-        self.model.space.move_agent(self, new_pos)
-
-    def get_angle(self):
-        angle = random.randint(0, 360)
-        return angle
-
-    def get_gender(self):
-        return self._gender
+                    return False
+        return True
 
 
 class Visitor(Person):
@@ -111,8 +114,8 @@ class Visitor(Person):
         super().__init__(unique_id, model)
         self.type = "Visitor"
 
-    # def step(self):
-    #     self.move()
+    def step(self):
+        self.move()
 
 
 class Worker(Person):
@@ -180,7 +183,9 @@ class ConcertHall(Model):
 
             self.space.place_agent(worker, (x, y))
 
-        self.datacollector = DataCollector(agent_reporters={"positions": "pos"})
+        self.datacollector = DataCollector(
+            agent_reporters={"x_pos": get_x_loc, "y_pos": get_y_loc}
+        )
 
     def save_locations(self):
         agents = self.space.get_neighbors(
@@ -205,5 +210,5 @@ class ConcertHall(Model):
 
     def step(self) -> None:
         self.save_locations()
-        # self.datacollector.collect(self)
+        self.datacollector.collect(self)
         self.schedule.step()
