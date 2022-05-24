@@ -9,6 +9,9 @@ import random
 # pandas dataframes fixen
 # moet uiteindelijk visueel duidelijk zijn en moet plotje komen
 
+# TODO
+# Kleine bias naar rechts maken
+
 
 def get_x_loc(agent):
     return agent.pos[0]
@@ -28,29 +31,35 @@ class Person(Agent):
         self._type = ""
 
     def move(self):
+        # Get a random angle and calculate the x and y unit vectors
         angle = self.get_angle()
         x_unit = np.cos(angle)
         y_unit = np.sin(angle)
 
+        # Calculate the displacement vectors
         x_displacement = x_unit * self._walking_speed
         y_displacement = y_unit * self._walking_speed
 
+        # Calculate the new position
         new_x_pos = self.pos[0] + x_displacement
         new_y_pos = self.pos[1] + y_displacement
         new_pos = (new_x_pos, new_y_pos)
 
+        # Check if the new position complies with the bound checks
         if self.bound_checks(new_x_pos, new_y_pos) == False:
             return
 
+        # Check if there is another agent in the new position
         agents_new_pos = self.model.space.get_neighbors(new_pos, self._size)
-
         if len(agents_new_pos) > 1:
             return
 
+        # Move the agent
         self.model.space.move_agent(self, new_pos)
 
     def get_angle(self):
-        angle = random.random() * 2 * np.pi
+        """Returns a random angle with a 2% bias towards the right"""
+        angle = random.uniform(-0.01, 1.01) * 2 * np.pi
         return angle
 
     def bound_checks(self, new_x_pos, new_y_pos):
@@ -123,8 +132,8 @@ class Worker(Person):
         super().__init__(unique_id, model)
         self.type = "Worker"
 
-    def step(self):
-        self.move()
+    # def step(self):
+    #     self.move()
 
 
 class ConcertHall(Model):

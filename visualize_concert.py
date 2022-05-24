@@ -3,28 +3,31 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from matplotlib.colors import ListedColormap
 
-model = ConcertHall(100, 10, 100, 100)
+if __name__ == "__main__":
+    visitors = 1000
+    workers = 10
+    steps = 10
 
-steps = 10
-for _ in range(steps):
-    print(f"step {_}")
-    model.step()
+    model = ConcertHall(visitors, workers, 100, 100)
 
-data = model.datacollector.get_agent_vars_dataframe()
-print(data)
+    print("Computing the model")
+    for i in range(steps):
+        model.step()
 
-# print(data.index.get_level_values(0))
+    positions = model.datacollector.get_agent_vars_dataframe()
+    positions = positions.groupby(level=0)
 
+    print("Creating the animation")
+    fig, ax = plt.subplots()
+    plt.grid()
 
-# locations = model.get_locations()
+    colourmap = ["black"] * visitors + ["red"] * workers
 
-# print(locations)
-
-# fig, ax = plt.subplots()
-# locations = model.get_locations()
-# plt.grid()
-# images = [[plt.scatter(image[:, 0], image[:, 1], c="k")] for image in locations]
-
-
-# ani = animation.ArtistAnimation(fig, images, interval=100, blit=True, repeat_delay=100)
-# ani.save("animations/concert.gif")
+    images = [
+        [plt.scatter(image.to_numpy()[:, 0], image.to_numpy()[:, 1], c=colourmap)]
+        for step, image in positions
+    ]
+    ani = animation.ArtistAnimation(
+        fig, images, interval=100, blit=True, repeat_delay=100
+    )
+    ani.save("animations/concert.gif")
