@@ -1,12 +1,12 @@
 from concert_model import ConcertHall
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
-from matplotlib.colors import ListedColormap
+
 
 if __name__ == "__main__":
-    visitors = 1000
+    visitors = 3000
     workers = 10
-    steps = 10
+    steps = 700
 
     model = ConcertHall(visitors, workers, 100, 100)
 
@@ -24,9 +24,17 @@ if __name__ == "__main__":
     colourmap = ["black"] * visitors + ["red"] * workers
 
     images = [
-        [plt.scatter(image.to_numpy()[:, 0], image.to_numpy()[:, 1], c=colourmap)]
+        [
+            plt.scatter(
+                image.to_numpy()[:, 0],
+                image.to_numpy()[:, 1],
+                c=colourmap,
+                linewidths=0.01,
+            )
+        ]
         for step, image in positions
     ]
+
     ani = animation.ArtistAnimation(
         fig, images, interval=100, blit=True, repeat_delay=100
     )

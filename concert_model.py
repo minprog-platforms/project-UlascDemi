@@ -1,7 +1,9 @@
+from __future__ import annotations
 from mesa import Agent, Model
 from mesa.space import ContinuousSpace
 from mesa.time import RandomActivation
 from mesa.datacollection import DataCollector
+from copy import deepcopy
 import numpy as np
 import random
 
@@ -27,10 +29,11 @@ class Person(Agent):
         self._uid = unique_id
         self._size = 0.5
         # self._running = False
-        self._walking_speed = 1.4
+        self._walking_speed = 0.5
         self._type = ""
+        self._status = ""
 
-    def move(self):
+    def move(self) -> None:
         # Get a random angle and calculate the x and y unit vectors
         angle = self.get_angle()
         x_unit = np.cos(angle)
@@ -46,24 +49,45 @@ class Person(Agent):
         new_pos = (new_x_pos, new_y_pos)
 
         # Check if the new position complies with the bound checks
-        if self.bound_checks(new_x_pos, new_y_pos) == False:
-            return
-
-        # Check if there is another agent in the new position
-        agents_new_pos = self.model.space.get_neighbors(new_pos, self._size)
-        if len(agents_new_pos) > 1:
+        if (
+            self.collision_check(new_pos)
+            or self.bound_checks(new_pos)
+            or self.accident_check(new_pos)
+        ):
             return
 
         # Move the agent
         self.model.space.move_agent(self, new_pos)
 
-    def get_angle(self):
-        """Returns a random angle with a 2% bias towards the right"""
-        angle = random.uniform(-0.01, 1.01) * 2 * np.pi
+    def get_angle(self) -> float:
+        """Returns a random angle with a 4% bias towards the right"""
+        angle = random.uniform(-0.06, 1.06) * 2 * np.pi
         return angle
 
-    def bound_checks(self, new_x_pos, new_y_pos):
+    def collision_check(self, new_pos: tuple) -> bool:
+        """
+        Check if there is another agent in the new position
+        Returns False if the movement is possible
+        True when not
+        """
+        agents_new_pos = self.model.space.get_neighbors(new_pos, self._size)
+        if len(agents_new_pos) > 1:
+            return True
+        return False
+
+    def accident_check(self, new_pos: tuple) -> bool:
+        agents_new_pos = self.model.space.get_neighbors(new_pos, 5)
+        for agent in agents_new_pos:
+            if agent.get_status == "Accident":
+                return True
+        return False
+
+    def bound_checks(self, new_pos: tuple[float]) -> bool:
         """Returns true or false"""
+
+        new_x_pos = new_pos[0]
+        new_y_pos = new_pos[1]
+
         bot_bound = self.model.worker_space
         right_bound = self.model.space.width - self.model.worker_space
         top_bound = self.model.space.height - self.model.worker_space
@@ -77,45 +101,11 @@ class Person(Agent):
                 or new_y_pos > top_bound
                 or new_y_pos < bot_bound
             ):
-                return False
-        elif self.type == "Worker":
-            # Bottom side
-            if self.pos[1] < bot_bound:
-                if (
-                    new_x_pos < 0
-                    or new_x_pos > self.model.space.width
-                    or new_y_pos < 0
-                    or new_y_pos > self.model.space.height
-                ):
-                    return False
-            # Right side
-            elif self.pos[0] > right_bound:
-                if (
-                    new_x_pos < right_bound
-                    or new_x_pos > self.model.space.width
-                    or new_y_pos < 0
-                    or new_y_pos > self.model.space.height
-                ):
-                    return False
-            # Top side
-            elif self.pos[1] > top_bound:
-                if (
-                    new_x_pos < 0
-                    or new_x_pos > self.model.space.width
-                    or new_y_pos < top_bound
-                    or new_y_pos > self.model.space.height
-                ):
-                    return False
-            # Left side
-            elif self.pos[0] < left_bound:
-                if (
-                    new_x_pos < 0
-                    or new_x_pos > self.model.worker_space
-                    or new_y_pos < 0
-                    or new_y_pos > self.model.space.height
-                ):
-                    return False
-        return True
+                return True
+        return False
+
+    def get_status(self) -> str:
+        return self._status
 
 
 class Visitor(Person):
@@ -123,8 +113,15 @@ class Visitor(Person):
         super().__init__(unique_id, model)
         self.type = "Visitor"
 
-    def step(self):
-        self.move()
+    def set_accident(self):
+        self._status = "Accident"
+
+    def step(self) -> None:
+        if self._status != "Accident":
+            self.move()
+
+        # if random.random() < 0.01:
+        #     self.set_accident()
 
 
 class Worker(Person):
@@ -132,24 +129,29 @@ class Worker(Person):
         super().__init__(unique_id, model)
         self.type = "Worker"
 
-    # def step(self):
+    def move_to_accident(self):
+        # TODO
+        pass
+
+    # def step(self) -> None:
     #     self.move()
 
 
 class ConcertHall(Model):
-    def __init__(self, n_visitors, n_workers, width, height) -> None:
+    def __init__(self, n_visit: int, n_work: int, width: int, height: int) -> None:
         assert width > 2
         assert height > 2
 
-        self._n_visitor = n_visitors
-        self._n_worker = n_workers
+        self._step_number = 0
+        self._n_visitor = n_visit
+        self._n_worker = n_work
         self._width = width
         self._height = height
         self._middle = (width / 2, height / 2)
         self.worker_space = 2
         self.space = ContinuousSpace(width, height, False)
         self.schedule = RandomActivation(self)
-        self._locations = []
+        self.previous_accidents = []
 
         # Create the visitors
         for i in range(self._n_visitor):
@@ -196,28 +198,40 @@ class ConcertHall(Model):
             agent_reporters={"x_pos": get_x_loc, "y_pos": get_y_loc}
         )
 
-    def save_locations(self):
+    def get_space(self) -> "ContinuousSpace":
+        return self.space
+
+    def check_accidents(self) -> tuple:
         agents = self.space.get_neighbors(
             self._middle,
             np.sqrt((self.space.width / 2) ** 2 + (self.space.height / 2) ** 2),
         )
+        accident_positions = [
+            agent.pos for agent in agents if agent.get_status() == "Accident"
+        ]
 
-        positions = np.array([agent.pos for agent in agents])
-        self._locations.append(positions)
+        return accident_positions
 
-    def get_locations(self):
-        return self._locations
+    def check_new_accident(self) -> bool:
+        accidents = self.check_accidents()
 
-    def get_space(self):
-        return self.space
+        if accidents != self.previous_accidents:
+            self.previous_accidents = accidents
+            return True
 
-    def get_width(self):
-        return self._width
+        return False
 
-    def get_heigth(self):
-        return self._height
+    def get_step_number(self) -> int:
+        return self._step_number
+
+    def increase_step(self) -> None:
+        self._step_number += 1
 
     def step(self) -> None:
-        self.save_locations()
+
+        if self.check_new_accident():
+            print(self.get_step_number())
+
         self.datacollector.collect(self)
         self.schedule.step()
+        self.increase_step()
