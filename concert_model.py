@@ -48,8 +48,8 @@ class Person(Agent):
         self._size = 0.5
         # self._running = False
         self._walking_speed = 0.5
-        self._type = ""
         self._status = ""
+        self.type = ""
 
     def get_angle(self) -> float:
         """Returns a random angle with a 12% bias towards the right for the first 60
@@ -150,20 +150,28 @@ class Worker(Person):
         self._walking_speed = 1
         self.original_pos = ()
         self.accident_pos = ()
+        self.accident_number = -1
 
     def set_status_accident(self):
         self._status = "MovingToAccident"
 
-    def start_moving_to_accident(self, position: tuple):
+    def set_status_none(self):
+        self._status = ""
+
+    def start_moving_to_accident(self, position: tuple, accident_number: int):
         if self._status != "MovingToAccident":
             return
         self.original_pos = self.pos
         self.accident_pos = position
+        self.accident_number = accident_number
         self.move_to_accident()
 
     def move_to_accident(self):
         if self._status != "MovingToAccident":
             return
+
+        if self.model.distance(self.accident_pos, self.pos) < 1:
+            self.set_status_none()
 
         acc_x_pos = self.accident_pos[0]
         acc_y_pos = self.accident_pos[1]
@@ -295,10 +303,10 @@ class ConcertHall(Model):
     def get_accident_loc(self) -> tuple:
         accident_number = self.accident_number
         self.accident_number += 1
-        return self.previous_accidents[accident_number]
+        return (self.previous_accidents[accident_number], accident_number)
 
     def move_nearest_worker(self) -> None:
-        accident_loc = self.get_accident_loc()
+        accident_loc, accident_num = self.get_accident_loc()
 
         all_agents = self.get_agents()
         free_agents = [
@@ -317,7 +325,7 @@ class ConcertHall(Model):
                 closest_worker = agent
 
         closest_worker.set_status_accident()
-        closest_worker.start_moving_to_accident(accident_loc)
+        closest_worker.start_moving_to_accident(accident_loc, accident_num)
 
     def get_step_number(self) -> int:
         return self._step_number
@@ -327,7 +335,6 @@ class ConcertHall(Model):
 
     def step(self) -> None:
         if self.check_new_accident():
-            # print(self.get_step_number())
             self.move_nearest_worker()
 
         if random.random() < 0.03:
