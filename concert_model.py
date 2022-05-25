@@ -5,6 +5,7 @@ from mesa.time import RandomActivation
 from mesa.datacollection import DataCollector
 from copy import deepcopy
 import numpy as np
+import math
 import random
 
 # TODO
@@ -14,12 +15,29 @@ import random
 # TODO
 # Kleine bias naar rechts maken
 
+# TODO
+# ipv kijken zijn er accidents, laat weten wanneer er een accident is
 
-def get_x_loc(agent):
+
+def get_x_loc(agent: "Person") -> float:
     return agent.pos[0]
 
 
-def get_y_loc(agent):
+def get_y_loc(agent: "Person") -> float:
+    return agent.pos[1]
+
+
+def get_accident_x_loc(agent: "Person") -> float:
+    if agent.get_status() != "MovingToAccident":
+        return np.nan
+
+    return agent.pos[0]
+
+
+def get_accident_y_loc(agent: "Person") -> float:
+    if agent.get_status() != "MovingToAccident":
+        return np.nan
+
     return agent.pos[1]
 
 
@@ -32,6 +50,15 @@ class Person(Agent):
         self._walking_speed = 0.5
         self._type = ""
         self._status = ""
+
+    def get_angle(self) -> float:
+        """Returns a random angle with a 12% bias towards the right for the first 60
+        steps, afterwards returns a uniform random angle."""
+        if self.model.get_step_number() < 60:
+            angle = random.uniform(-0.06, 1.06) * 2 * np.pi
+        else:
+            angle = random.random() * 2 * np.pi
+        return angle
 
     def move(self) -> None:
         # Get a random angle and calculate the x and y unit vectors
@@ -58,11 +85,6 @@ class Person(Agent):
 
         # Move the agent
         self.model.space.move_agent(self, new_pos)
-
-    def get_angle(self) -> float:
-        """Returns a random angle with a 4% bias towards the right"""
-        angle = random.uniform(-0.06, 1.06) * 2 * np.pi
-        return angle
 
     def collision_check(self, new_pos: tuple) -> bool:
         """
@@ -120,21 +142,56 @@ class Visitor(Person):
         if self._status != "Accident":
             self.move()
 
-        # if random.random() < 0.01:
-        #     self.set_accident()
-
 
 class Worker(Person):
     def __init__(self, unique_id, model) -> None:
         super().__init__(unique_id, model)
         self.type = "Worker"
+        self._walking_speed = 1
+        self.original_pos = ()
+        self.accident_pos = ()
+
+    def set_status_accident(self):
+        self._status = "MovingToAccident"
+
+    def start_moving_to_accident(self, position: tuple):
+        if self._status != "MovingToAccident":
+            return
+        self.original_pos = self.pos
+        self.accident_pos = position
+        self.move_to_accident()
 
     def move_to_accident(self):
-        # TODO
-        pass
+        if self._status != "MovingToAccident":
+            return
 
-    # def step(self) -> None:
-    #     self.move()
+        acc_x_pos = self.accident_pos[0]
+        acc_y_pos = self.accident_pos[1]
+
+        self_x_pos = self.pos[0]
+        self_y_pos = self.pos[1]
+
+        x_vec = acc_x_pos - self_x_pos
+        y_vec = acc_y_pos - self_y_pos
+
+        angle = math.atan2(y_vec, x_vec)
+        x_unit = np.cos(angle)
+        y_unit = np.sin(angle)
+
+        # Calculate the displacement vectors
+        x_displacement = x_unit * self._walking_speed
+        y_displacement = y_unit * self._walking_speed
+
+        # Calculate the new position
+        new_x_pos = self.pos[0] + x_displacement
+        new_y_pos = self.pos[1] + y_displacement
+        new_pos = (new_x_pos, new_y_pos)
+
+        # Move the agent
+        self.model.space.move_agent(self, new_pos)
+
+    def step(self) -> None:
+        self.move_to_accident()
 
 
 class ConcertHall(Model):
@@ -152,6 +209,7 @@ class ConcertHall(Model):
         self.space = ContinuousSpace(width, height, False)
         self.schedule = RandomActivation(self)
         self.previous_accidents = []
+        self.accident_number = 0
 
         # Create the visitors
         for i in range(self._n_visitor):
@@ -201,11 +259,23 @@ class ConcertHall(Model):
     def get_space(self) -> "ContinuousSpace":
         return self.space
 
-    def check_accidents(self) -> tuple:
+    def distance(self, pos1: tuple, pos2: tuple):
+        delta_x = pos1[0] - pos2[0]
+        delta_y = pos1[1] - pos2[1]
+
+        distance = np.sqrt(delta_x**2 + delta_y**2)
+        return distance
+
+    def get_agents(self) -> list:
         agents = self.space.get_neighbors(
             self._middle,
             np.sqrt((self.space.width / 2) ** 2 + (self.space.height / 2) ** 2),
         )
+        return np.array(agents)
+
+    def check_accidents(self) -> tuple:
+        agents = self.get_agents()
+
         accident_positions = [
             agent.pos for agent in agents if agent.get_status() == "Accident"
         ]
@@ -215,11 +285,39 @@ class ConcertHall(Model):
     def check_new_accident(self) -> bool:
         accidents = self.check_accidents()
 
-        if accidents != self.previous_accidents:
-            self.previous_accidents = accidents
-            return True
+        for accident in accidents:
+            if accident not in self.previous_accidents:
+                self.previous_accidents.append(accident)
+                return True
 
         return False
+
+    def get_accident_loc(self) -> tuple:
+        accident_number = self.accident_number
+        self.accident_number += 1
+        return self.previous_accidents[accident_number]
+
+    def move_nearest_worker(self) -> None:
+        accident_loc = self.get_accident_loc()
+
+        all_agents = self.get_agents()
+        free_agents = [
+            agent
+            for agent in all_agents
+            if agent.get_status() != "MovingToAccident" and agent.type == "Worker"
+        ]
+
+        lowest_distance = 10000
+        closest_worker = 0
+        for agent in free_agents:
+            distance = self.distance(agent.pos, accident_loc)
+
+            if distance < lowest_distance:
+                lowest_distance = distance
+                closest_worker = agent
+
+        closest_worker.set_status_accident()
+        closest_worker.start_moving_to_accident(accident_loc)
 
     def get_step_number(self) -> int:
         return self._step_number
@@ -228,9 +326,17 @@ class ConcertHall(Model):
         self._step_number += 1
 
     def step(self) -> None:
-
         if self.check_new_accident():
-            print(self.get_step_number())
+            # print(self.get_step_number())
+            self.move_nearest_worker()
+
+        if random.random() < 0.03:
+            agents = self.get_agents()
+            random_agent = random.choice(agents)
+            while random_agent.type == "Worker":
+                random_agent = random.choice(agents)
+
+            random_agent.set_accident()
 
         self.datacollector.collect(self)
         self.schedule.step()

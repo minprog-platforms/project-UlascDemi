@@ -4,9 +4,9 @@ import matplotlib.animation as animation
 
 
 if __name__ == "__main__":
-    visitors = 3000
+    visitors = 200
     workers = 10
-    steps = 700
+    steps = 150
 
     model = ConcertHall(visitors, workers, 100, 100)
 
