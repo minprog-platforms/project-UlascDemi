@@ -27,14 +27,17 @@ from mesa.datacollection import DataCollector
 
 
 def get_x_loc(agent: "Person") -> float:
+    """Returns the x location of an agent"""
     return agent.pos[0]
 
 
 def get_y_loc(agent: "Person") -> float:
+    """Returns the y location of an agent"""
     return agent.pos[1]
 
 
 def get_accident_x_loc(agent: "Person") -> float:
+    """Returns the x location of an agent moving to an accident"""
     if agent.get_status() != "MovingToAccident":
         return np.nan
 
@@ -42,6 +45,7 @@ def get_accident_x_loc(agent: "Person") -> float:
 
 
 def get_accident_y_loc(agent: "Person") -> float:
+    """Returns the y location of an agent moving to an accident"""
     if agent.get_status() != "MovingToAccident":
         return np.nan
 
@@ -49,6 +53,9 @@ def get_accident_y_loc(agent: "Person") -> float:
 
 
 class Person(Agent):
+    """
+    
+    """
     def __init__(self, unique_id: int, model) -> None:
         super().__init__(unique_id, model)
         self._uid = unique_id
@@ -59,34 +66,60 @@ class Person(Agent):
         self.type = ""
 
     def get_angle(self) -> float:
-        """Returns a random angle with a 12% bias towards the right for the first 60
-        steps, afterwards returns a uniform random angle."""
+        """
+        Returns a random angle with a 12% bias towards the right for the first 60
+        steps, afterwards returns a uniform random angle.
+        """
         if self.model.get_step_number() < 60:
             angle = random.uniform(-0.06, 1.06) * 2 * np.pi
         else:
             angle = random.random() * 2 * np.pi
         return angle
 
-    def collision_check(self, new_pos: tuple) -> bool:
+    def collision_check(self, new_pos: tuple[float]) -> bool:
         """
-        Check if there is another agent in the new position
-        Returns False if the movement is possible
-        True when not
+        Check if there is another agent in the new position.
+        
+        arguments:
+            new_pos (tuple) = the new position, in the format of (x, y)
+        
+        returns:
+            True = the movement is not possible
+            False = the movement is possible
         """
         agents_new_pos = self.model.space.get_neighbors(new_pos, self._size)
         if len(agents_new_pos) > 1:
             return True
         return False
 
-    def accident_check(self, new_pos: tuple) -> bool:
+    def accident_check(self, new_pos: tuple[float]) -> bool:
+        """
+        Check if there is another agent that has an accident
+        in a radius of 5 meters of the new location.
+        
+        arguments:
+            new_pos (tuple) = the new position, in the format of (x, y)
+        
+        returns:
+            True = the movement is not possible
+            False = the movement is possible
+        """
         agents_new_pos = self.model.space.get_neighbors(new_pos, 5)
         for agent in agents_new_pos:
-            if agent.get_status == "Accident":
+            if agent.get_status() == "Accident":
                 return True
         return False
 
     def bound_checks(self, new_pos: tuple[float]) -> bool:
-        """Returns true or false"""
+        """
+        Checks if the new location complies within the bounds
+        of the visitor area. These bounds are the width and
+        length of the area minus the area for the workers.
+        
+        returns:
+            True = the movement is not possible
+            False = the movement is possible
+        """
 
         new_x_pos = new_pos[0]
         new_y_pos = new_pos[1]
