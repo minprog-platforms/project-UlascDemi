@@ -1,12 +1,14 @@
 from __future__ import annotations
+
+import numpy as np
+import math
+import random
+
 from mesa import Agent, Model
 from mesa.space import ContinuousSpace
 from mesa.time import RandomActivation
 from mesa.datacollection import DataCollector
-from copy import deepcopy
-import numpy as np
-import math
-import random
+
 
 # TODO
 # pandas dataframes fixen
@@ -17,6 +19,11 @@ import random
 
 # TODO
 # ipv kijken zijn er accidents, laat weten wanneer er een accident is
+
+# TODO
+# TODO
+# TODO
+# FIX DAT AGENT OOK EEN ACCIDENT_NUM KRIJGT ZODAT WE DAT KUNNEN OPLOSSEN
 
 
 def get_x_loc(agent: "Person") -> float:
@@ -59,32 +66,6 @@ class Person(Agent):
         else:
             angle = random.random() * 2 * np.pi
         return angle
-
-    def move(self) -> None:
-        # Get a random angle and calculate the x and y unit vectors
-        angle = self.get_angle()
-        x_unit = np.cos(angle)
-        y_unit = np.sin(angle)
-
-        # Calculate the displacement vectors
-        x_displacement = x_unit * self._walking_speed
-        y_displacement = y_unit * self._walking_speed
-
-        # Calculate the new position
-        new_x_pos = self.pos[0] + x_displacement
-        new_y_pos = self.pos[1] + y_displacement
-        new_pos = (new_x_pos, new_y_pos)
-
-        # Check if the new position complies with the bound checks
-        if (
-            self.collision_check(new_pos)
-            or self.bound_checks(new_pos)
-            or self.accident_check(new_pos)
-        ):
-            return
-
-        # Move the agent
-        self.model.space.move_agent(self, new_pos)
 
     def collision_check(self, new_pos: tuple) -> bool:
         """
@@ -134,6 +115,33 @@ class Visitor(Person):
     def __init__(self, unique_id, model) -> None:
         super().__init__(unique_id, model)
         self.type = "Visitor"
+        self.accident_number = -1
+
+    def move(self) -> None:
+        # Get a random angle and calculate the x and y unit vectors
+        angle = self.get_angle()
+        x_unit = np.cos(angle)
+        y_unit = np.sin(angle)
+
+        # Calculate the displacement vectors
+        x_displacement = x_unit * self._walking_speed
+        y_displacement = y_unit * self._walking_speed
+
+        # Calculate the new position
+        new_x_pos = self.pos[0] + x_displacement
+        new_y_pos = self.pos[1] + y_displacement
+        new_pos = (new_x_pos, new_y_pos)
+
+        # Check if the new position complies with the bound checks
+        if (
+            self.collision_check(new_pos)
+            or self.bound_checks(new_pos)
+            or self.accident_check(new_pos)
+        ):
+            return
+
+        # Move the agent
+        self.model.space.move_agent(self, new_pos)
 
     def set_accident(self):
         self._status = "Accident"
@@ -152,35 +160,18 @@ class Worker(Person):
         self.accident_pos = ()
         self.accident_number = -1
 
-    def set_status_accident(self):
-        self._status = "MovingToAccident"
+    def set_status(self, status):
+        self._status = status
 
-    def set_status_none(self):
-        self._status = ""
-
-    def start_moving_to_accident(self, position: tuple, accident_number: int):
-        if self._status != "MovingToAccident":
-            return
-        self.original_pos = self.pos
-        self.accident_pos = position
-        self.accident_number = accident_number
-        self.move_to_accident()
-
-    def move_to_accident(self):
-        if self._status != "MovingToAccident":
-            return
-
-        if self.model.distance(self.accident_pos, self.pos) < 1:
-            self.set_status_none()
-
-        acc_x_pos = self.accident_pos[0]
-        acc_y_pos = self.accident_pos[1]
+    def move(self, destination):
+        dest_x_pos = destination[0]
+        dest_y_pos = destination[1]
 
         self_x_pos = self.pos[0]
         self_y_pos = self.pos[1]
 
-        x_vec = acc_x_pos - self_x_pos
-        y_vec = acc_y_pos - self_y_pos
+        x_vec = dest_x_pos - self_x_pos
+        y_vec = dest_y_pos - self_y_pos
 
         angle = math.atan2(y_vec, x_vec)
         x_unit = np.cos(angle)
@@ -198,8 +189,44 @@ class Worker(Person):
         # Move the agent
         self.model.space.move_agent(self, new_pos)
 
-    def step(self) -> None:
+    def start_moving_to_accident(self, position: tuple, accident_number: int):
+        if self._status != "MovingToAccident":
+            return
+        self.original_pos = self.pos
+        self.accident_pos = position
+        self.accident_number = accident_number
         self.move_to_accident()
+
+    def move_to_accident(self):
+        if self._status != "MovingToAccident":
+            return
+
+        if self.model.distance(self.accident_pos, self.pos) < 1:
+            self.model.space.move_agent(self, self.accident_pos)
+            self.set_status("MovingBack")
+            return
+
+        self.move(self.accident_pos)
+
+    def move_to_orig(self):
+        if self._status != "MovingBack":
+            return
+
+        if self.model.distance(self.pos, self.original_pos) < 1:
+            self.model.space.move_agent(self, self.original_pos)
+            self.set_status("")
+            return
+
+        self.move(self.original_pos)
+
+    def resolve_accident(self):
+        pass
+
+    def step(self) -> None:
+        if self._status == "MovingToAccident":
+            self.move_to_accident()
+        elif self._status == "MovingBack":
+            self.move_to_orig()
 
 
 class ConcertHall(Model):
@@ -315,7 +342,7 @@ class ConcertHall(Model):
             if agent.get_status() != "MovingToAccident" and agent.type == "Worker"
         ]
 
-        lowest_distance = 10000
+        lowest_distance = 100000
         closest_worker = 0
         for agent in free_agents:
             distance = self.distance(agent.pos, accident_loc)
@@ -324,7 +351,7 @@ class ConcertHall(Model):
                 lowest_distance = distance
                 closest_worker = agent
 
-        closest_worker.set_status_accident()
+        closest_worker.set_status("MovingToAccident")
         closest_worker.start_moving_to_accident(accident_loc, accident_num)
 
     def get_step_number(self) -> int:

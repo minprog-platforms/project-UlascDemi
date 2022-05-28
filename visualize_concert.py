@@ -3,15 +3,17 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
 
-if __name__ == "__main__":
-    visitors = 200
+def main():
+    visitors = 30
     workers = 10
-    steps = 150
+    steps = 300
 
     model = ConcertHall(visitors, workers, 100, 100)
 
     print("Computing the model")
     for i in range(steps):
+        if i % 50 == 0 and i != 0:
+            print(f"Step {i}/{steps}")
         model.step()
 
     positions = model.datacollector.get_agent_vars_dataframe()
@@ -39,3 +41,7 @@ if __name__ == "__main__":
         fig, images, interval=100, blit=True, repeat_delay=100
     )
     ani.save("animations/concert.gif")
+
+
+if __name__ == "__main__":
+    main()
