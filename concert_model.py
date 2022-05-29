@@ -69,6 +69,9 @@ class Person(Agent):
         """
         Returns a random angle with a 12% bias towards the right for the first 60
         steps, afterwards returns a uniform random angle.
+        
+        Returns:
+            angle (float) = An angle in radians
         """
         if self.model.get_step_number() < 60:
             angle = random.uniform(-0.06, 1.06) * 2 * np.pi
@@ -80,12 +83,12 @@ class Person(Agent):
         """
         Check if there is another agent in the new position.
         
-        arguments:
+        Arguments:
             new_pos (tuple) = the new position, in the format of (x, y)
         
-        returns:
-            True = the movement is not possible
-            False = the movement is possible
+        Returns:
+            True = The movement is not possible
+            False = The movement is possible
         """
         agents_new_pos = self.model.space.get_neighbors(new_pos, self._size)
         if len(agents_new_pos) > 1:
@@ -97,12 +100,12 @@ class Person(Agent):
         Check if there is another agent that has an accident
         in a radius of 5 meters of the new location.
         
-        arguments:
+        Arguments:
             new_pos (tuple) = the new position, in the format of (x, y)
         
-        returns:
-            True = the movement is not possible
-            False = the movement is possible
+        Returns:
+            True = The movement is not possible
+            False = The movement is possible
         """
         agents_new_pos = self.model.space.get_neighbors(new_pos, 5)
         for agent in agents_new_pos:
@@ -116,9 +119,9 @@ class Person(Agent):
         of the visitor area. These bounds are the width and
         length of the area minus the area for the workers.
         
-        returns:
-            True = the movement is not possible
-            False = the movement is possible
+        Returns:
+            True = The movement is not possible
+            False = The movement is possible
         """
 
         new_x_pos = new_pos[0]
@@ -141,16 +144,31 @@ class Person(Agent):
         return False
 
     def get_status(self) -> str:
+        """
+        Returns the status of the agent
+        
+        Returns:
+            _status (str) = the status of the agent
+        """
         return self._status
 
 
 class Visitor(Person):
+    """Visitor"""
     def __init__(self, unique_id, model) -> None:
         super().__init__(unique_id, model)
         self.type = "Visitor"
         self.accident_number = -1
 
     def move(self) -> None:
+        """
+        Uses the get_angle() method to receive an angle and move the
+        agent in that direction. The distance travelled is dependent
+        on self._walking_speed.
+        
+        Returns:
+            None
+        """
         # Get a random angle and calculate the x and y unit vectors
         angle = self.get_angle()
         x_unit = np.cos(angle)
@@ -177,14 +195,29 @@ class Visitor(Person):
         self.model.space.move_agent(self, new_pos)
 
     def set_accident(self):
+        """
+        Sets the self._status to "Accident".
+        
+        Returns:
+            None
+        """
         self._status = "Accident"
 
     def step(self) -> None:
+        """
+        Step function for the model. This function checks if
+        the agent has an accident status, if not then it moves
+        the agent.
+        
+        Returns:
+            None
+        """
         if self._status != "Accident":
             self.move()
 
 
 class Worker(Person):
+    """worker"""
     def __init__(self, unique_id, model) -> None:
         super().__init__(unique_id, model)
         self.type = "Worker"
@@ -193,19 +226,45 @@ class Worker(Person):
         self.accident_pos = ()
         self.accident_number = -1
 
-    def set_status(self, status):
+    def set_status(self, status: str) -> None:
+        """
+        Sets the status to a given status.
+        
+        Arguments:
+            status (string) = The new status
+            
+        Returns:
+            None
+        """
         self._status = status
 
-    def move(self, destination):
+    def move(self, destination: Tuple[float]) -> None:
+        """
+        Moves the agent in the direction of a position.
+        This method first calculates the angle towards a
+        position and then moves the agent towards that position
+        with a distance according to the walking speed.
+        
+        Aguments:
+            destination (tuple) = a tuple containing two float positions in the
+                                    format of (x, y)
+        
+        Returns:
+            None
+        """
+        # Unpacks the destination position tuple
         dest_x_pos = destination[0]
         dest_y_pos = destination[1]
 
+        # Unpacks the agents position tuple
         self_x_pos = self.pos[0]
         self_y_pos = self.pos[1]
 
+        # Calculates the x and y vectors
         x_vec = dest_x_pos - self_x_pos
         y_vec = dest_y_pos - self_y_pos
 
+        # Calculates the angle and then the x and y unit vectors
         angle = math.atan2(y_vec, x_vec)
         x_unit = np.cos(angle)
         y_unit = np.sin(angle)
@@ -222,7 +281,20 @@ class Worker(Person):
         # Move the agent
         self.model.space.move_agent(self, new_pos)
 
-    def start_moving_to_accident(self, position: tuple, accident_number: int):
+    def start_moving_to_accident(self, position: tuple[float], accident_number: int) -> None:
+        """
+        Starts the process of moving to an accident. It first checks if the
+        agent is not already moving towards an accident, then saves the
+        original position and accident number internally. This is so that
+        the agent can find its original position back.
+        
+        Arguments:
+            position (tuple) = a tuple containing two float positions in the
+                                    format of (x, y)
+                                    
+        Returns:
+            None
+        """
         if self._status != "MovingToAccident":
             return
         self.original_pos = self.pos
@@ -230,7 +302,16 @@ class Worker(Person):
         self.accident_number = accident_number
         self.move_to_accident()
 
-    def move_to_accident(self):
+    def move_to_accident(self) -> None:
+        """
+        Checks if the agent should be moving to the accident
+        and if the agent is already at the accident. If both
+        checks are passed, the agent is moved towards the
+        accident position with the move() method.
+        
+        returns:
+            None
+        """
         if self._status != "MovingToAccident":
             return
 
@@ -292,6 +373,7 @@ class ConcertHall(Model):
             self.space.place_agent(visitor, (x, y))
 
         i += 1
+        
         # Create the workers
         for j in range(i, i + self._n_worker):
             worker = Worker(j, self)
