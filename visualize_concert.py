@@ -4,9 +4,9 @@ import matplotlib.animation as animation
 
 
 def main():
-    visitors = 30
-    workers = 10
-    steps = 300
+    visitors = 3000
+    workers = 15
+    steps = 400
 
     model = ConcertHall(visitors, workers, 100, 100)
 
@@ -16,31 +16,38 @@ def main():
             print(f"Step {i}/{steps}")
         model.step()
 
-    positions = model.datacollector.get_agent_vars_dataframe()
-    positions = positions.groupby(level=0)
+    workers = model.get_workers()
 
-    print("Creating the animation")
-    fig, ax = plt.subplots()
-    plt.grid()
+    worker_x_loc = [worker.pos[0] for worker in workers]
+    worker_y_loc = [worker.pos[1] for worker in workers]
 
-    colourmap = ["black"] * visitors + ["red"] * workers
+    time_spent_accidents = [worker.time_spent_accidents for worker in workers]
 
-    images = [
-        [
-            plt.scatter(
-                image.to_numpy()[:, 0],
-                image.to_numpy()[:, 1],
-                c=colourmap,
-                linewidths=0.01,
-            )
-        ]
-        for step, image in positions
-    ]
+    # positions = model.datacollector.get_agent_vars_dataframe()
+    # positions = positions.groupby(level=0)
 
-    ani = animation.ArtistAnimation(
-        fig, images, interval=100, blit=True, repeat_delay=100
-    )
-    ani.save("animations/concert.gif")
+    # print("Creating the animation")
+    # fig, ax = plt.subplots()
+    # plt.grid()
+
+    # colourmap = ["black"] * visitors + ["red"] * workers
+
+    # images = [
+    #     [
+    #         plt.scatter(
+    #             image.to_numpy()[:, 0],
+    #             image.to_numpy()[:, 1],
+    #             c=colourmap,
+    #             linewidths=0.01,
+    #         )
+    #     ]
+    #     for step, image in positions
+    # ]
+
+    # ani = animation.ArtistAnimation(
+    #     fig, images, interval=100, blit=True, repeat_delay=100
+    # )
+    # ani.save("animations/concert.gif")
 
 
 if __name__ == "__main__":
