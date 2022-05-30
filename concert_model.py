@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import numpy as np
 import math
 import random
+import numpy as np
 
 from mesa import Agent, Model
 from mesa.space import ContinuousSpace
@@ -422,21 +422,37 @@ class Worker(Person):
 
 class ConcertHall(Model):
     """
+    A class representing the concerthall in which all agents roam. This concerthall is a
+    ContinousSpace object where each agent can have a float value as its x and y position.
 
     ...
 
     Attributes
     ----------
-    self._step_number (int) =
+    self._step_number (int) = the current number of steps
+    self._n_visitor (int) = the amount of visitors
+    self._n_worker (int) = the amount of workers
+    self._width (int/float) = the width of the concert hall
+    self._height (int/float) = the height of the concert hall
+    self._middle (tuple) = the middle point of the concert hall
+    self.worker_space (int/float) = the space reserved for the workers
+    self.space (ContinousSpace) = the space in which the agents roam in
+    self.schedule (RandomActivation) = the scheduler for the agents
+    self.previous_accidents (list) = a list containing all accidents that has occured
+    self.accident_number (int) = the number of accidents that have happened
+
     Methods
     -------
-    set_status(self, status: str) -> None:
-    movement_multiplier(self, angle: float) -> float:
-    move(self, destination: tuple[float]) -> None:
-    start_moving_to_accident(self, position: tuple[float], accident_number: int) -> None:
-    move_to_accident(self) -> None:
-    move_to_orig(self) -> None:
-    step(self) -> None
+    distance(self, pos1: tuple, pos2: tuple) -> float
+    get_agents(self) -> list
+    get_workers(self) -> list:
+    check_accidents(self) -> tuple:
+    check_new_accident(self) -> bool:
+    get_accident_loc(self) -> tuple:
+    move_nearest_worker(self) -> None:
+    get_step_number(self) -> int:
+    increase_step(self) -> None:
+    step(self) -> None:
 
     """
 
@@ -540,6 +556,12 @@ class ConcertHall(Model):
         return np.array(agents)
 
     def get_workers(self) -> list:
+        """
+        Returns all workers present in the ConcertHall
+
+        Returns:
+            list = a numpy array of all workers present
+        """
         agents = self.space.get_neighbors(
             self._middle,
             np.sqrt((self.space.width / 2) ** 2 + (self.space.height / 2) ** 2),
