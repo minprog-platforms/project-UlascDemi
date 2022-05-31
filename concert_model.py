@@ -1,3 +1,30 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+# ---------------------------------------------------------------------------
+# Created By  : Ulas
+# Created Date: 31-05-2022
+# ---------------------------------------------------------------------------
+"""
+This module contains four classes that can be used for the simulation of a
+crowd at a concert. The four classes are:
+    - Person(Agent)
+    - Visitor(Person)
+    - Worker(Person)
+    - ConcertHall(Model)
+
+The main model that should be used is the ConcertHall model. The ConcertHall
+object will create and place the Visitor and Worker objects. This ConcertHall
+inherets from the model module of the mesa framework.
+The Visitor and Worker classes both inheret from the Person class, which in
+turn inherets from the Agent class of the mesa framework.
+
+This simulation can be used by using the visualize_concert.py script. This
+will call and create ConcertHall objects and simulate the concert. This file
+will output an html file with two heatmaps, one containing information about
+the average time spent walking to an accident and the other about how many
+accidents each Worker agent has resolved.
+"""
+# ---------------------------------------------------------------------------
 from __future__ import annotations
 
 import math
@@ -235,6 +262,7 @@ class Worker(Person):
     self.accident_number (int) = the accident number of the visitor that the worker is
                                     working on
     self.time_spent_accidents (int) = the amount of steps spent walking towards accidents
+    self.accident_amount (int) = the amount of accidents performed
 
     Methods
     -------
@@ -244,18 +272,20 @@ class Worker(Person):
     start_moving_to_accident(self, position: tuple[float], accident_number: int) -> None:
     move_to_accident(self) -> None:
     move_to_orig(self) -> None:
+    def get_avg_accident_time(self) -> float:
     step(self) -> None
 
     """
 
-    def __init__(self, unique_id, model) -> None:
+    def __init__(self, unique_id, model, start_pos: tuple) -> None:
         super().__init__(unique_id, model)
         self.type = "Worker"
         self._walking_speed = 1
-        self.original_pos = ()
         self.accident_pos = ()
         self.accident_number = -1
         self.time_spent_accidents = 0
+        self.accident_amount = 0
+        self.original_pos = start_pos
 
     def set_status(self, status: str) -> None:
         """
@@ -353,6 +383,7 @@ class Worker(Person):
         Arguments:
             position (tuple) = a tuple containing two float positions in the
                                     format of (x, y)
+            accident_number (int) = the accident id corresponding to the accident
 
         Returns:
             None
@@ -360,9 +391,9 @@ class Worker(Person):
         if self._status != "MovingToAccident":
             return
 
-        self.original_pos = self.pos
         self.accident_pos = position
         self.accident_number = accident_number
+        self.accident_amount += 1
         self.move_to_accident()
 
     def move_to_accident(self) -> None:
@@ -404,6 +435,21 @@ class Worker(Person):
             return
 
         self.move(self.original_pos)
+
+    def get_avg_accident_time(self) -> float:
+        """
+        Returns the average time spent on accidents. If the agent has had no accidents
+        or spent 0 time on accidents, the function will return -1 as the average time.
+
+        Returns:
+            avg_time (float) = the average time spent on an accident
+        """
+        if self.time_spent_accidents == 0 or self.accident_amount == 0:
+            avg_time = -1
+        else:
+            avg_time = self.time_spent_accidents / self.accident_amount
+
+        return avg_time
 
     def step(self) -> None:
         """
@@ -488,8 +534,6 @@ class ConcertHall(Model):
 
         # Create the workers
         for j in range(i, i + self._n_worker):
-            worker = Worker(j, self)
-            self.schedule.add(worker)
             rng_number = random.random()
             # Bottom side
             if rng_number < 0.25:
@@ -511,6 +555,9 @@ class ConcertHall(Model):
             elif rng_number >= 0.75 and rng_number <= 1.00:
                 x = self.random.randrange(0, self.worker_space)
                 y = self.random.randrange(0, self.space.height)
+
+            worker = Worker(j, self, (x, y))
+            self.schedule.add(worker)
 
             self.space.place_agent(worker, (x, y))
 
