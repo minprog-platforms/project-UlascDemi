@@ -725,7 +725,7 @@ class ConcertHall(Model):
         if self.check_new_accident():
             self.move_nearest_worker()
 
-        if random.random() < 0.03:
+        if self.get_step_number() > 200 and random.random() < 0.03:
             agents = self.get_agents()
             random_agent = random.choice(agents)
             while random_agent.type == "Worker":
