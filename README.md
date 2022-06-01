@@ -10,4 +10,6 @@ The visitors are defined by their location in the concert hall and how they act.
 
 The minimal viable product is a crowd with a linearly decreasing space between visitors as the distance to the stage decreases. The first aid workers can then wiggle, and push their way to the accidents. The time spent walking towards the accident will then be averaged and saved according to the location of the first-aid worker. This way at the end a heatmap of the outer perimiter with their locations can be created.
 
+<p align="center">
 ![Concert demonstration](https://github.com/minprog-platforms/project-UlascDemi/blob/master/animations/concert.gif)
+</p>
