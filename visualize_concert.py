@@ -20,36 +20,42 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
 import argparse
+import time as t
+from math import ceil
 
 
 def main(output, n_visitors, n_workers, n_frames, n_simulations):
-    # Number of visitors, workers and seconds of runtime
-    # n_visitors = 2500
-    # n_workers = 15
-    # n_frames = 600
-
+    # Dimensions of the concert hall
     width = 100
     height = 100
 
-    # Number of batch simulation
-    # n_simulations = 5
-
     # Creating an empty array to later append to
-    avg_time_hmap = np.zeros((101, 101))
-    avg_acc_hmap = np.zeros((101, 101))
+    avg_time_hmap = np.zeros((width + 1, height + 1))
+    avg_acc_hmap = np.zeros((width + 1, height + 1))
+    n_workers_tile = np.zeros((width + 1, height + 1))
 
     # Running the batch siulations
     for i in range(n_simulations):
         print("------------------------------------")
         print(f"Simulation {i+1} of {n_simulations}")
 
+        if i == 0:
+            start = t.time()
+        elif i == 1:
+            end = t.time()
+            time_left = (end - start) * (n_simulations - i)
+            print(f"Estimated time left: {ceil(time_left/60)} minutes")
+        else:
+            time_left = (end - start) * (n_simulations - i)
+            print(f"Estimated time left: {ceil(time_left/60)} minutes")
+
         # Creating the model
         model = ConcertHall(n_visitors, n_workers, width, height)
 
         # Computing each frame
-        for i in range(n_frames):
-            if i % 50 == 0 and i != 0:
-                print(f"Step {i}/{n_frames}")
+        for j in range(n_frames):
+            if j % 50 == 0 and j != 0:
+                print(f"Step {j}/{n_frames}")
             model.step()
 
         workers = model.get_workers()
@@ -63,20 +69,13 @@ def main(output, n_visitors, n_workers, n_frames, n_simulations):
         resolved_accidents = [worker.accident_amount for worker in workers]
 
         # Insert the average time into the previously made empty array
-        for i, value in enumerate(time):
-            avg_time_hmap[y_loc[i], x_loc[i]] += value
+        for j, value in enumerate(time):
+            avg_time_hmap[y_loc[j], x_loc[j]] += value
+            n_workers_tile[y_loc[j], x_loc[j]] += 1
 
         # Insert the average resolved accidents into the previously made array
-        for i, value in enumerate(resolved_accidents):
-            avg_acc_hmap[y_loc[i], x_loc[i]] += value
-
-        # Temporary output in case program crashes
-        if i % 10 == 0:
-            output1 = np.true_divide(avg_time_hmap, i)
-            output2 = np.true_divide(avg_acc_hmap, i)
-
-            output1.to_csv("temporary_output/avg_time.csv")
-            output2.to_csv("temporary_output/avg_acc_resolved.csv")
+        for j, value in enumerate(resolved_accidents):
+            avg_acc_hmap[y_loc[j], x_loc[j]] += value
 
     # Visitor area width and height
     conc_width = width - model.worker_space
@@ -86,8 +85,14 @@ def main(output, n_visitors, n_workers, n_frames, n_simulations):
     avg_time_hmap[model.worker_space : conc_width, model.worker_space : conc_height] = 0
     avg_acc_hmap[model.worker_space : conc_width, model.worker_space : conc_height] = 0
 
-    np.true_divide(avg_time_hmap, n_simulations)
-    np.true_divide(avg_acc_hmap, n_simulations)
+    # Go through the grids and take the average
+    for i_row in range(len(n_workers_tile)):
+        for j_col in range(len(n_workers_tile[i])):
+            if n_workers_tile[i_row, j_col] == 0:
+                continue
+
+            avg_time_hmap[i_row, j_col] /= n_workers_tile[i_row, j_col]
+            avg_acc_hmap[i_row, j_col] /= n_workers_tile[i_row, j_col]
 
     # Create the subplots
     fig = make_subplots(
@@ -104,30 +109,32 @@ def main(output, n_visitors, n_workers, n_frames, n_simulations):
     fig.add_trace(go.Heatmap(z=avg_acc_hmap, connectgaps=True), 1, 2)
     fig.write_html(output)
 
-    # positions = model.datacollector.get_agent_vars_dataframe()
-    # positions = positions.groupby(level=0)
+    if False:
+        positions = model.datacollector.get_agent_vars_dataframe()
+        positions = positions.groupby(level=0)
 
-    # print("Creating the animation")
-    # fig, ax = plt.subplots()
-    # plt.grid()
+        print("Creating the animation")
+        fig, ax = plt.subplots()
+        plt.grid()
 
-    # colourmap = ["black"] * visitors + ["red"] * workers
+        colourmap = ["black"] * n_visitors + ["red"] * n_workers
 
-    # images = [
-    #     [
-    #         plt.scatter(
-    #             image.to_numpy()[:, 0],
-    #             image.to_numpy()[:, 1],
-    #             c=colourmap,
-    #             linewidths=0.01,
-    #         )
-    #     ]
-    #     for step, image in positions
-    # ]
+        images = [
+            [
+                plt.scatter(
+                    image.to_numpy()[:, 0],
+                    image.to_numpy()[:, 1],
+                    c=colourmap,
+                    linewidths=0.01,
+                )
+            ]
+            for step, image in positions
+        ]
 
-    # ani = animation.ArtistAnimation(
-    #     fig, images, interval=100, blit=True, repeat_delay=100
-    # )
+        ani = animation.ArtistAnimation(
+            fig, images, interval=100, blit=True, repeat_delay=50
+        )
+        ani.save("concert.gif")
 
 
 if __name__ == "__main__":
@@ -143,7 +150,6 @@ if __name__ == "__main__":
         default=3000,
         help="Amount of visitors (default: 3000)",
     )
-
     parser.add_argument(
         "-w",
         "--n_workers",
@@ -169,7 +175,7 @@ if __name__ == "__main__":
     # Read arguments from command line
     args = parser.parse_args()
 
-    # Run main with provide arguments
+    # Run main with provided arguments
     main(
         args.output,
         args.n_visitors,

@@ -18,7 +18,7 @@ inherets from the model module of the mesa framework.
 The Visitor and Worker classes both inheret from the Person class, which in
 turn inherets from the Agent class of the mesa framework.
 
-This simulation can be used by using the visualize_concert.py script. This
+This simulation can be run by using the visualize_concert.py script. This
 will call and create ConcertHall objects and simulate the concert. This file
 will output an html file with two heatmaps, one containing information about
 the average time spent walking to an accident and the other about how many
@@ -56,7 +56,7 @@ class Person(Agent):
 
     Attributes
     ----------
-    self._uid (int) = first name of the person
+    self._uid (int) = the unique used id of the Person
     self._size (float) = the size of the person in meters
     self._walking_speed (float) = the walking speed in m/s
     self._status (str) = the status of the person
@@ -72,7 +72,7 @@ class Person(Agent):
 
     """
 
-    def __init__(self, unique_id: int, model) -> None:
+    def __init__(self, unique_id: int, model: "Model") -> None:
         super().__init__(unique_id, model)
         self._uid = unique_id
         self._size = 0.5
@@ -113,7 +113,7 @@ class Person(Agent):
     def accident_check(self, new_pos: tuple[float]) -> bool:
         """
         Check if there is another agent that has an accident
-        in a radius of 5 meters of the new location.
+        in a radius of 2 meters of the new location.
 
         Arguments:
             new_pos (tuple) = the new position, in the format of (x, y)
@@ -188,7 +188,7 @@ class Visitor(Person):
 
     """
 
-    def __init__(self, unique_id, model) -> None:
+    def __init__(self, unique_id, model: "Model") -> None:
         super().__init__(unique_id, model)
         self.type = "Visitor"
         self.accident_number = -1
@@ -419,8 +419,8 @@ class Worker(Person):
 
     def move_to_orig(self) -> None:
         """
-        Checks if the agent should me moving to the accident and if it is already
-        at its original position. If both checks are passed, the agent is moved
+        Checks if the agent should be moving to its original position, and if it
+        is already at its original position. If both checks are passed, the agent is moved
         towards the original position.
 
         Returns:
@@ -590,7 +590,7 @@ class ConcertHall(Model):
         """
         Returns all agents found in the space. This is done by making use of the
         get_neighbors() method of the ContinuousSpace object. This method needs a point
-        and a radius to search for the agents. The middle point, and the lenth between
+        and a radius to search for the agents. The middle point, and the length between
         the middle point and one of the corners are given to this method.
 
         Returns:
