@@ -17,6 +17,6 @@ The minimal viable product is a crowd with a linearly decreasing space between v
 
 ![Heatmap](doc/heatmap.png)
 
-![youtube link](https://youtu.be/9MWYXhF7l98)
+Click the picture under for a visual demonstration
 
 [![Demonstration - ABM ConcertHall Simulation - Ulas](http://img.youtube.com/vi/9MWYXhF7l98/0.jpg)](http://www.youtube.com/watch?v=9MWYXhF7l98 "Demonstration - ABM ConcertHall Simulation - Ulas")
