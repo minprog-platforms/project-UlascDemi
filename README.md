@@ -1,5 +1,7 @@
 # Project ABM, Optimal Positioning of First-Aid Responder
 
+Project Ulas Demirtas
+
 This model will help answer the question of what is the optimal positioning of placing first-aid workers during a concert in the Ziggo dome. This will be answered by simulating a crowd, with crowdlike behaviour and placing "accidents" scattered throughout the concerthall.
 
 There will be two kinds of agents, visitors and first-aid workers. These will be placed in the concerthall. The concerthall consists of two areas. A large rectangle where the visitors will be placed, and an outer perimeter around the rectangle where the first-aid workers will be placed. When an accident occurs, the closest first-aid worker will try to get there as quickly as possible. Which first-aid worker gets chosen will be fine tuned as the model comes along.
