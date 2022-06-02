@@ -17,3 +17,4 @@ The minimal viable product is a crowd with a linearly decreasing space between v
 
 ![Heatmap](doc/heatmap.png)
 
+![youtube link](https://youtu.be/9MWYXhF7l98)
